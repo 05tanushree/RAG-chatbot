@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 # Load variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 class Config:
     APP_PORT = int(os.getenv("APP_PORT", 8000))

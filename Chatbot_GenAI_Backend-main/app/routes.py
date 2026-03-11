@@ -23,13 +23,13 @@ def allowed_file(filename):
 
 @routes_bp.route("/upload", methods=["POST"])
 def upload_documents():
+    saved_files = []
     try:
         if "files" not in request.files:
             return jsonify({"error": "No files part in the request"}), 400
 
         files = request.files.getlist("files")
 
-        saved_files = []
         for file in files:
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
@@ -49,6 +49,17 @@ def upload_documents():
 
     except Exception as e:
         logger.exception("Upload failed")
+        
+        # Cleanup successfully saved local files if processing failed downstream
+        for saved_file in saved_files:
+            try:
+                path = Path(saved_file)
+                if path.exists():
+                    logger.info(f"Cleaning up file {saved_file} after upload failure.")
+                    path.unlink()
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup file {saved_file}: {cleanup_error}")
+                
         return jsonify({"error": "Internal server error during file upload."}), 500
 
 
@@ -97,7 +108,8 @@ def delete_file(filename):
         logger.info(f"Deleting document with filename: {filename}")
         is_deleted = delete_document_by_filename(filename)
         if not is_deleted:
-            return jsonify({"error": "No document found with the specified filename."}), 404    
+            # We still want to delete it from the local disk even if vector store logic fails
+            logger.warning(f"No document found with the specified filename in the vector store. Still proceeding to delete locally.")    
             
         file_path.unlink()
 

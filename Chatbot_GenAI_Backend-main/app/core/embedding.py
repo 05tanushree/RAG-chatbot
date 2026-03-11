@@ -1,29 +1,36 @@
-
-import requests
-from typing import List
 import os
 import logging
-
-headers = {
-    "Authorization": f"Bearer {os.getenv('HUGGINGFACEHUB_API_TOKEN')}",
-    "Content-Type": "application/json"
-}
+from typing import List
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/distilbert-base-nli-mean-tokens")    
 
-# Function to get embedding for a given text using Hugging Face API
-# This function assumes that the environment variable EMBEDDING_MODEL is set to a valid Hugging Face model ID
-# Example: EMBEDDING_MODEL="sentence-transformers/distilbert-base-nli-mean-tokens"
+# Use the same embedding model defined in environment, but default to BAAI/bge-small-en-v1.5 if not found
+# as that's what the user mentioned they're using, and it's a good default.
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")    
+
+# Initialize the model once when the module loads
+try:
+    logger.info(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
+    # Initialize sentence-transformers model. This downloads the model on first run if not cached.
+    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    logger.info("Embedding model loaded successfully.")
+except Exception as e:
+    logger.error(f"Failed to load embedding model {EMBEDDING_MODEL_NAME}: {e}")
+    model = None
+
 
 def get_embedding(text: str) -> List[float]:
+    """
+    Function to get embedding for a given text using local sentence-transformers model.
+    """
+    if model is None:
+        raise ValueError("Embedding model was not loaded properly.")
+    
     try:
-        url = f"https://api-inference.huggingface.co/models/{EMBEDDING_MODEL}"
-        print(f"url: {url}")
-        response = requests.post(url, headers=headers, json={"inputs": text}, timeout=60, verify=False)
-        response.raise_for_status()
-        embedding = response.json()
-        return embedding  # This is a list of floats
+        # Generate the embedding. Output is a numpy array, convert to list of floats for consistency with previous API
+        embedding = model.encode(text).tolist()
+        return embedding
     except Exception as e:
         logger.error(f"Error getting embedding: {e}")
         raise ValueError("Failed to get embedding from the model.")

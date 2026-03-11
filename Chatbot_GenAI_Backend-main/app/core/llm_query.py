@@ -13,21 +13,25 @@ from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
-HUGGINGFACE_API_TOKEN = os.getenv('HUGGINGFACEHUB_API_TOKEN')
-LLM_MODEL = os.getenv('LLM_MODEL') #    mistralai/Mixtral-8x7B-Instruct-v0.1
-
-headers = {
-    "Authorization": f"Bearer {os.getenv('HUGGINGFACEHUB_API_TOKEN')}",
-    "Content-Type": "application/json"
-}
+# Fetch these dynamic at runtime instead of statically when module imports
+# HUGGINGFACE_API_TOKEN = os.getenv('HUGGINGFACEHUB_API_TOKEN')
+# LLM_MODEL = os.getenv('LLM_MODEL') #    mistralai/Mixtral-8x7B-Instruct-v0.1
 
 client = chromadb.Client(Settings(persist_directory="./chroma_store"))
 collection = client.get_or_create_collection("documents")
 
 def build_client() -> InferenceClient:
+    token = os.getenv('HUGGINGFACEHUB_API_TOKEN')
+    model = os.getenv('LLM_MODEL')
+    if not model or "mistralai" in model:
+        model = 'meta-llama/Meta-Llama-3-8B-Instruct'
+    
+    if not token:
+        logger.error("HUGGINGFACEHUB_API_TOKEN is not defined in environment!")
+        
     return InferenceClient(
-        model=LLM_MODEL,
-        token=HUGGINGFACE_API_TOKEN,
+        model=model,
+        token=token,
         timeout=300
     )
 
@@ -79,8 +83,14 @@ def get_llm_response(prompt: str):
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Provide well formated answer from the given context.\n\n{prompt}"}
         ]
+        
+        # ensure LLM_MODEL is read from env properly
+        llm_model_name = os.getenv('LLM_MODEL')
+        if not llm_model_name or "mistralai" in llm_model_name:
+            llm_model_name = 'meta-llama/Meta-Llama-3-8B-Instruct'
+        
         result = client.chat.completions.create(
-            model=LLM_MODEL,
+            model=llm_model_name,
             messages=messages,
             temperature=0.1,
             max_tokens=200

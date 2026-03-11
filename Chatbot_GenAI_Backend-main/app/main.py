@@ -1,14 +1,16 @@
 # app/main.py
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env before anything else!
+load_dotenv(override=True)
+
 from flask import Flask
 from flask_cors import CORS
 from app.core.logger import setup_logging
 from app.routes import routes_bp
-import os
-from dotenv import load_dotenv
 from app.core.config import Config
 
-# Load environment variables from .env
-load_dotenv()
 token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 if token:
     print(f"✅ Success: Token found (starts with: {token[:4]}...)")
@@ -26,7 +28,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # Register blueprints
 app.register_blueprint(routes_bp)
 
-app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH_MB * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH_MB * 1024 * 1024 
 
 @app.route("/")
 def root():
